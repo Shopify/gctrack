@@ -1,0 +1,25 @@
+PATH
+  remote: .
+  specs:
+    gctrack (0.0.1)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    power_assert (1.0.2)
+    rake (12.0.0)
+    rake-compiler (1.0.4)
+      rake
+    test-unit (3.2.5)
+      power_assert
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  gctrack!
+  rake-compiler (~> 1.0)
+  test-unit
+
+BUNDLED WITH
+   1.15.0

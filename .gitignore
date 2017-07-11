@@ -1,0 +1,5 @@
+/.bundle/
+/lib/gctrack/*.so
+/lib/gctrack/*.bundle
+/tmp/*
+*.gem
