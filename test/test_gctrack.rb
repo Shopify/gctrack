@@ -13,8 +13,19 @@ class TestGctrack < Test::Unit::TestCase
   end
 
   def test_enabled_generates_events
-    GC::Tracker.enable { puts "gc event" }
+    called = false
+
+    GC::Tracker.enable do
+      called = true
+    end
     GC.start
+
+    # TODO: There is some *weird* VM issue happening here, where the update to
+    # `called` is not immediately visible until its been accessed. By reading
+    # `called` here, it seems to somehow force the local to be updated.
+    nil if called
+
+    assert called
   ensure
     GC::Tracker.disable
   end
