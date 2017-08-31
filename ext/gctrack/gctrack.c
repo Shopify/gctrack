@@ -5,16 +5,25 @@
 #include <errno.h>
 #include <time.h>
 
+typedef struct {
+  unsigned long cycles;
+  unsigned long duration;
+  void *parent;
+} stat_record;
+
 static VALUE mGC;
 static ID id_tracepoint;
 
 static bool enabled = false;
-static unsigned long cycles = 0;
+static stat_record *last_record;
 
 static VALUE
 gc_cycles(int argc, VALUE *argv, VALUE klass)
 {
-  return ULONG2NUM(cycles);
+  if (last_record) {
+    return ULONG2NUM(last_record->cycles);
+  }
+  return ULONG2NUM(0);  
 }
 
 static void gc_hook(VALUE tpval, void *data)
@@ -27,7 +36,7 @@ static void gc_hook(VALUE tpval, void *data)
       case RUBY_INTERNAL_EVENT_GC_ENTER:
           break;
       case RUBY_INTERNAL_EVENT_GC_EXIT:
-          cycles++;
+          last_record->cycles++;
           break;
   }
 }
@@ -49,10 +58,12 @@ enable(int argc, VALUE *argv, VALUE klass)
     enabled = true;
   } else {
     if (!enabled) {
-      rb_raise(rb_eTypeError, "GC::Tracker: CORRUPTED FSM!");
       enabled = true;
+      rb_raise(rb_eTypeError, "GC::Tracker: CORRUPTED FSM!");
     }
   }
+
+  last_record = calloc(1, sizeof(stat_record));
   
   return Qtrue;
 }
@@ -63,13 +74,14 @@ disable(VALUE self)
   VALUE tracepoint = rb_ivar_get(mGC, id_tracepoint);  
   if (NIL_P(tracepoint)) {
     if (enabled) {
-      rb_raise(rb_eTypeError, "GC::Tracker: CORRUPTED FSM!");
       enabled = false;
+      rb_raise(rb_eTypeError, "GC::Tracker: CORRUPTED FSM!");
     }
     return Qfalse;
   }
 
-  cycles = 0; // todo kill this!
+  free(last_record);
+  last_record = NULL;
 
   rb_tracepoint_disable(tracepoint);
   rb_ivar_set(mGC, id_tracepoint, Qnil);
