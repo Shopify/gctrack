@@ -16,28 +16,8 @@ static ID id_tracepoint;
 
 static bool enabled = false;
 
-static stat_record *last_record;
+static stat_record *last_record = NULL;
 static unsigned long last_enter;
-
-// TODO DELETE THESE
-static VALUE
-gc_duration(int argc, VALUE *argv, VALUE klass)
-{
-  if (last_record) {
-    return ULONG2NUM(last_record->duration);
-  }
-  return ULONG2NUM(0);  
-}
-
-static VALUE
-gc_cycles(int argc, VALUE *argv, VALUE klass)
-{
-  if (last_record) {
-    return ULONG2NUM(last_record->cycles);
-  }
-  return ULONG2NUM(0);  
-}
-// END TODO
 
 static unsigned long nanotime()
 {
@@ -82,11 +62,15 @@ end_record(int argc, VALUE *argv, VALUE klass)
 {
   if (last_record) {
     stat_record *record = last_record;
-    stat_record *last_record = record->parent;
   
-    // TODO read data of record and build rb_array
+    VALUE stats = rb_ary_new2(2);
+    rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
+    rb_ary_store(stats, 1, ULONG2NUM(record->duration));
   
+    last_record = record->parent;
     free(record);  
+
+    return stats;
   }
   return Qnil;
 }
@@ -154,9 +138,5 @@ Init_gctrack()
   rb_define_singleton_method(cTracker, "disable", disable, 0);
 
   rb_define_singleton_method(cTracker, "start_record", start_record, 0);
-  rb_define_singleton_method(cTracker, "end_record", end_record, 1);
-
-  // TODO DELETE THESE
-  rb_define_singleton_method(cTracker, "cycles", gc_cycles, 0);
-  rb_define_singleton_method(cTracker, "duration", gc_duration, 0);
+  rb_define_singleton_method(cTracker, "end_record", end_record, 0);
 }
