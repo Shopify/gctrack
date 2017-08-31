@@ -25,6 +25,7 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.enable
     GC.start
     assert GC::Tracker.cycles > 0
+    assert GC::Tracker.duration > 0
   ensure
     GC::Tracker.disable
     assert GC::Tracker.cycles == 0

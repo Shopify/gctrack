@@ -17,6 +17,18 @@ static ID id_tracepoint;
 static bool enabled = false;
 static stat_record *last_record;
 
+static unsigned long last_enter;
+
+// TODO DELETE THESE
+static VALUE
+gc_duration(int argc, VALUE *argv, VALUE klass)
+{
+  if (last_record) {
+    return ULONG2NUM(last_record->duration);
+  }
+  return ULONG2NUM(0);  
+}
+
 static VALUE
 gc_cycles(int argc, VALUE *argv, VALUE klass)
 {
@@ -24,6 +36,16 @@ gc_cycles(int argc, VALUE *argv, VALUE klass)
     return ULONG2NUM(last_record->cycles);
   }
   return ULONG2NUM(0);  
+}
+// END TODO
+
+static unsigned long nanotime()
+{
+  struct timespec ts;
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+    rb_sys_fail("clock_gettime");
+  }
+  return ts.tv_sec * 1e9 + ts.tv_nsec;
 }
 
 static void gc_hook(VALUE tpval, void *data)
@@ -34,10 +56,12 @@ static void gc_hook(VALUE tpval, void *data)
   rb_trace_arg_t *tparg = rb_tracearg_from_tracepoint(tpval);
   switch (rb_tracearg_event_flag(tparg)) {
       case RUBY_INTERNAL_EVENT_GC_ENTER:
-          break;
+        last_enter = nanotime();
+        break;
       case RUBY_INTERNAL_EVENT_GC_EXIT:
-          last_record->cycles++;
-          break;
+        last_record->cycles++;
+        last_record->duration += nanotime() - last_enter;
+        break;
   }
 }
 
@@ -100,6 +124,9 @@ Init_gctrack()
   rb_ivar_set(mGC, id_tracepoint, Qnil);
 
   rb_define_singleton_method(cTracker, "enable", enable, 0);
-  rb_define_singleton_method(cTracker, "cycles", gc_cycles, 0);
   rb_define_singleton_method(cTracker, "disable", disable, 0);
+
+  // TODO DELETE THESE
+  rb_define_singleton_method(cTracker, "cycles", gc_cycles, 0);
+  rb_define_singleton_method(cTracker, "duration", gc_duration, 0);
 }
