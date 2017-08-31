@@ -23,6 +23,7 @@ class TestGctrack < Test::Unit::TestCase
   def test_enabled_generates_events
     assert_equal 0, GC::Tracker.cycles
     assert GC::Tracker.enable
+    assert GC::Tracker.start_record
     GC.start
     assert GC::Tracker.cycles > 0
     assert GC::Tracker.duration > 0

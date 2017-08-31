@@ -15,8 +15,8 @@ static VALUE mGC;
 static ID id_tracepoint;
 
 static bool enabled = false;
-static stat_record *last_record;
 
+static stat_record *last_record;
 static unsigned long last_enter;
 
 // TODO DELETE THESE
@@ -50,7 +50,7 @@ static unsigned long nanotime()
 
 static void gc_hook(VALUE tpval, void *data)
 {
-  if (!enabled) {
+  if (!enabled || !last_record) {
       return;
   }
   rb_trace_arg_t *tparg = rb_tracearg_from_tracepoint(tpval);
@@ -63,6 +63,32 @@ static void gc_hook(VALUE tpval, void *data)
         last_record->duration += nanotime() - last_enter;
         break;
   }
+}
+
+static VALUE
+start_record(int argc, VALUE *argv, VALUE klass)
+{
+  stat_record *record = calloc(1, sizeof(start_record));
+  if (!record) {
+    return Qfalse;
+  }    
+  record->parent = last_record;
+  last_record = record;
+  return Qtrue;
+}
+
+static VALUE
+end_record(int argc, VALUE *argv, VALUE klass)
+{
+  if (last_record) {
+    stat_record *record = last_record;
+    stat_record *last_record = record->parent;
+  
+    // TODO read data of record and build rb_array
+  
+    free(record);  
+  }
+  return Qnil;
 }
 
 static VALUE
@@ -87,8 +113,6 @@ enable(int argc, VALUE *argv, VALUE klass)
     }
   }
 
-  last_record = calloc(1, sizeof(stat_record));
-  
   return Qtrue;
 }
 
@@ -104,8 +128,11 @@ disable(VALUE self)
     return Qfalse;
   }
 
-  free(last_record);
-  last_record = NULL;
+  while (last_record) {
+    stat_record *record = last_record;
+    last_record = record->parent;
+    free(record);
+  }
 
   rb_tracepoint_disable(tracepoint);
   rb_ivar_set(mGC, id_tracepoint, Qnil);
@@ -125,6 +152,9 @@ Init_gctrack()
 
   rb_define_singleton_method(cTracker, "enable", enable, 0);
   rb_define_singleton_method(cTracker, "disable", disable, 0);
+
+  rb_define_singleton_method(cTracker, "start_record", start_record, 0);
+  rb_define_singleton_method(cTracker, "end_record", end_record, 1);
 
   // TODO DELETE THESE
   rb_define_singleton_method(cTracker, "cycles", gc_cycles, 0);
