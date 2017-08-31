@@ -35,7 +35,8 @@ static void gc_hook(VALUE tpval, void *data)
 static VALUE
 enable(int argc, VALUE *argv, VALUE klass)
 {
-  if (NIL_P(rb_ivar_get(mGC, id_tracepoint))) {
+  VALUE tracepoint = rb_ivar_get(mGC, id_tracepoint);
+  if (NIL_P(tracepoint)) {
     rb_event_flag_t events;
     events = RUBY_INTERNAL_EVENT_GC_START | RUBY_INTERNAL_EVENT_GC_END_MARK | RUBY_INTERNAL_EVENT_GC_END_SWEEP;
     events |= RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
@@ -45,9 +46,14 @@ enable(int argc, VALUE *argv, VALUE klass)
     }
     rb_tracepoint_enable(tracepoint);
     rb_ivar_set(mGC, id_tracepoint, tracepoint);
+    enabled = true;
+  } else {
+    if (!enabled) {
+      rb_raise(rb_eTypeError, "GC::Tracker: CORRUPTED FSM!");
+      enabled = true;
+    }
   }
   
-  enabled = true;
   return Qtrue;
 }
 
@@ -56,6 +62,10 @@ disable(VALUE self)
 {
   VALUE tracepoint = rb_ivar_get(mGC, id_tracepoint);  
   if (NIL_P(tracepoint)) {
+    if (enabled) {
+      rb_raise(rb_eTypeError, "GC::Tracker: CORRUPTED FSM!");
+      enabled = false;
+    }
     return Qfalse;
   }
 
