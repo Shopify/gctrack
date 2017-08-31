@@ -3,9 +3,9 @@ require 'gctrack/gctrack'
 
 class TestGctrack < Test::Unit::TestCase
   def test_enable
-    GC::Tracker.enable { }
+    assert GC::Tracker.enable
   ensure
-    GC::Tracker.disable
+    assert GC::Tracker.disable
   end
 
   def test_returns_false_when_not_enabled
