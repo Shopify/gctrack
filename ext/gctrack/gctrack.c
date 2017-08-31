@@ -6,6 +6,13 @@
 #include <time.h>
 
 static bool enabled = false;
+static unsigned long cycles = 0;
+
+static VALUE
+gc_cycles(int argc, VALUE *argv, VALUE klass)
+{
+  return ULONG2NUM(cycles);
+}
 
 static VALUE
 enable(int argc, VALUE *argv, VALUE klass)
@@ -34,5 +41,6 @@ Init_gctrack()
   VALUE cTracker = rb_define_class_under(mGC, "Tracker", rb_cData);
 
   rb_define_singleton_method(cTracker, "enable", enable, -1);
+  rb_define_singleton_method(cTracker, "cycles", gc_cycles, 0);
   rb_define_singleton_method(cTracker, "disable", disable, 0);
 }
