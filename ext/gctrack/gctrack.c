@@ -7,8 +7,8 @@
 #include <stdlib.h>
 
 typedef struct {
-  unsigned long cycles;
-  unsigned long long duration;
+  uint32_t cycles;
+  uint64_t duration;
   void *parent;
 } record_t;
 
@@ -18,20 +18,20 @@ static ID id_tracepoint;
 static bool enabled = false;
 
 static record_t *last_record = NULL;
-static unsigned long long last_enter = 0;
+static uint64_t last_enter = 0;
 
-static unsigned long long 
+static uint64_t 
 nanotime()
 {
   struct timespec ts;
   if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
     rb_sys_fail("clock_gettime");
   }
-  return ts.tv_sec * (unsigned long long) 1000000000 + ts.tv_nsec;
+  return ts.tv_sec * (uint64_t) 1000000000 + ts.tv_nsec;
 }
 
 static inline void 
-add_gc_cycle(unsigned long long duration)
+add_gc_cycle(uint64_t duration)
 {
   record_t *record = last_record;
   while (record) {
