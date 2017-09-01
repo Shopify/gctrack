@@ -85,19 +85,19 @@ gctracker_start_record(int argc, VALUE *argv, VALUE klass)
 static VALUE
 gctracker_end_record(int argc, VALUE *argv, VALUE klass)
 {
-  if (last_record) {
-    record_t *record = last_record;
-    last_record = record->parent;
-    
-    VALUE stats = rb_ary_new2(2);
-    rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
-    rb_ary_store(stats, 1, ULONG2NUM(record->duration));
+  if (!last_record) {
+    return Qnil;
+  } 
+  record_t *record = last_record;
+  last_record = record->parent;
   
-    free(record);  
+  VALUE stats = rb_ary_new2(2);
+  rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
+  rb_ary_store(stats, 1, ULONG2NUM(record->duration));
 
-    return stats;
-  }
-  return Qnil;
+  free(record);  
+
+  return stats;
 }
 
 static VALUE
