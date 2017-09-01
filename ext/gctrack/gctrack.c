@@ -6,11 +6,13 @@
 #include <time.h>
 #include <stdlib.h>
 
-typedef struct {
+typedef struct record_t record_t;
+
+struct record_t {
   uint32_t cycles;
   uint64_t duration;
-  void *parent;
-} record_t;
+  record_t *parent;
+};
 
 static VALUE cTracker;
 static ID id_tracepoint;
@@ -37,7 +39,7 @@ add_gc_cycle(uint64_t duration)
   while (record) {
     record->cycles = record->cycles + 1;
     record->duration = record->duration + duration;
-    record = (record_t *) record->parent;
+    record = record->parent;
   }
 }
 
@@ -85,7 +87,7 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
 {
   if (last_record) {
     record_t *record = last_record;
-    last_record = (record_t *) record->parent;
+    last_record = record->parent;
     
     VALUE stats = rb_ary_new2(2);
     rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
@@ -138,7 +140,7 @@ gctracker_disable(VALUE self)
   enabled = false;
   while (last_record) {
     record_t *record = last_record;
-    last_record = (record_t *) record->parent;
+    last_record = record->parent;
     free(record);
   }
   last_record = NULL;
