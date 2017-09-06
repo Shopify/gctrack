@@ -14,10 +14,7 @@ struct record_t {
   record_t *parent;
 };
 
-static VALUE cTracker;
-static ID id_tracepoint;
-
-static bool enabled = false;
+static VALUE tracepoint = Qnil;
 
 static record_t *last_record = NULL;
 static uint64_t last_enter = 0;
@@ -43,10 +40,16 @@ add_gc_cycle(uint64_t duration)
   }
 }
 
+static inline bool 
+gctracker_enabled() 
+{
+  return !NIL_P(tracepoint) && rb_tracepoint_enabled_p(tracepoint);
+}
+
 static void 
 gctracker_hook(VALUE tpval, void *data)
 {
-  if (!enabled) {
+  if (!gctracker_enabled()) {
     return;
   }
   rb_trace_arg_t *tparg = rb_tracearg_from_tracepoint(tpval);
@@ -65,10 +68,22 @@ gctracker_hook(VALUE tpval, void *data)
   }
 }
 
+static void
+create_tracepoint() 
+{
+  rb_event_flag_t events;
+  events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
+  tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
+  if (NIL_P(tracepoint)) {
+    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't create tracepoint!");
+  }
+  rb_global_variable(&tracepoint);
+}
+
 static VALUE
 gctracker_start_record(int argc, VALUE *argv, VALUE klass)
 {
-  if(!enabled) {
+  if(!gctracker_enabled()) {
     return Qfalse;
   }
 
@@ -103,41 +118,31 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
 static VALUE
 gctracker_enable(int argc, VALUE *argv, VALUE klass)
 {
-  VALUE tracepoint = rb_ivar_get(cTracker, id_tracepoint);
   if (NIL_P(tracepoint)) {
-    enabled = true;
-    rb_event_flag_t events;
-    events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
-    tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
-    if (NIL_P(tracepoint)) { 
-      enabled = false;
-      return Qfalse;
-    }
-    rb_ivar_set(cTracker, id_tracepoint, tracepoint);
-    rb_tracepoint_enable(tracepoint);
-  } else if (!enabled) {
-    enabled = true;
-    rb_raise(rb_eTypeError, "GCTracker: CORRUPTED FSM!");
+    create_tracepoint();
   }
+
+  if (gctracker_enabled()) {
+    return Qtrue;
+  }
+
+  rb_tracepoint_enable(tracepoint);
   
-  return Qtrue;
+  return gctracker_enabled() ? Qtrue : Qfalse;
 }
 
 static VALUE
 gctracker_disable(VALUE self)
 {
-  VALUE tracepoint = rb_ivar_get(cTracker, id_tracepoint);  
-  if (NIL_P(tracepoint)) {
-    if (enabled) {
-      enabled = false;
-      rb_raise(rb_eTypeError, "GCTracker: CORRUPTED FSM!");
-    }
+  if (!gctracker_enabled()) {
     return Qfalse;
   }
 
   rb_tracepoint_disable(tracepoint);
-  rb_ivar_set(cTracker, id_tracepoint, Qnil);
-  enabled = false;
+  if (gctracker_enabled()) {
+    return Qfalse;
+  } 
+
   while (last_record) {
     record_t *record = last_record;
     last_record = record->parent;
@@ -152,10 +157,7 @@ void
 Init_gctrack()
 {
   VALUE mGC = rb_define_module("GC");
-  cTracker = rb_define_module_under(mGC, "Tracker");
-
-  id_tracepoint = rb_intern("__gc_tracepoint");  
-  rb_ivar_set(cTracker, id_tracepoint, Qnil);
+  VALUE cTracker = rb_define_module_under(mGC, "Tracker");
 
   rb_define_module_function(cTracker, "enable", gctracker_enable, 0);
   rb_define_module_function(cTracker, "disable", gctracker_disable, 0);
