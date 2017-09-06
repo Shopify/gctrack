@@ -127,8 +127,11 @@ gctracker_enable(int argc, VALUE *argv, VALUE klass)
   }
 
   rb_tracepoint_enable(tracepoint);
-  
-  return gctracker_enabled() ? Qtrue : Qfalse;
+  if (!gctracker_enabled()) {
+    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't enable tracepoint!");
+  }
+
+  return Qtrue;
 }
 
 static VALUE
@@ -140,7 +143,7 @@ gctracker_disable(VALUE self)
 
   rb_tracepoint_disable(tracepoint);
   if (gctracker_enabled()) {
-    return Qfalse;
+    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't disable tracepoint!");
   } 
 
   while (last_record) {
