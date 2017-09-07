@@ -5,9 +5,9 @@ Gem::Specification.new do |s|
   s.description = <<-DOC
     This gem can be used to track Ruby GC tracepoints that are normally only visible through GC extensions.
   DOC
-  s.homepage = 'https://github.com/csfrancis/gctrack'
-  s.authors = 'Scott Francis'
-  s.email   = 'scott.francis@shopify.com'
+  s.homepage = 'https://github.com/Shopify/gctrack'
+  s.authors = ['Scott Francis', 'Alex Snaps']
+  s.email   = ['scott.francis@shopify.com', 'alex.snaps@shopify.com']
   s.license = 'MIT'
 
   s.files = `git ls-files`.split("\n")
