@@ -4,173 +4,155 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <time.h>
+#include <stdlib.h>
 
-typedef struct gctrack_event_struct gctrack_event_t;
-struct gctrack_event_struct {
-  gctrack_event_t *next;
-  rb_event_flag_t ev;
+typedef struct record_t record_t;
+
+struct record_t {
+  uint32_t cycles;
+  uint64_t duration;
+  record_t *parent;
+};
+
+static VALUE tracepoint = Qnil;
+
+static record_t *last_record = NULL;
+static uint64_t last_enter = 0;
+
+static uint64_t 
+nanotime()
+{
   struct timespec ts;
-};
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+    rb_sys_fail("clock_gettime");
+  }
+  return ts.tv_sec * (uint64_t) 1000000000 + ts.tv_nsec;
+}
 
-typedef struct {
-  VALUE proc;
-  VALUE ctx;
-  gctrack_event_t *events;
-} gctrack_hook_data_t;
-
-static VALUE cTracker = Qnil;
-static ID idCall;
-static bool enabled = false;
-
-static void
-hook_data_mark(void *ptr)
+static inline void 
+add_gc_cycle(uint64_t duration)
 {
-  gctrack_hook_data_t *hook_data = (gctrack_hook_data_t *) ptr;
-  rb_gc_mark(hook_data->proc);
-  if (!NIL_P(hook_data->ctx)) {
-    rb_gc_mark(hook_data->ctx);
+  record_t *record = last_record;
+  while (record) {
+    record->cycles = record->cycles + 1;
+    record->duration = record->duration + duration;
+    record = record->parent;
   }
 }
 
-static void
-hook_data_free(void *ptr)
+static inline bool 
+gctracker_enabled() 
 {
-  gctrack_hook_data_t *hook_data = (gctrack_hook_data_t *) ptr;
-  gctrack_event_t *p = hook_data->events;
-
-  while (p != NULL) {
-    gctrack_event_t *cur = p;
-    p = p->next;
-    free(cur);
-  }
-
-  free(hook_data);
+  return !NIL_P(tracepoint) && rb_tracepoint_enabled_p(tracepoint);
 }
 
-static size_t
-hook_data_memsize(const void *ptr)
+static void 
+gctracker_hook(VALUE tpval, void *data)
 {
-  gctrack_hook_data_t *data = (gctrack_hook_data_t *) ptr;
-  size_t sz = sizeof(gctrack_hook_data_t);
-
-  for (gctrack_event_t *p = data->events; p != NULL; p = p->next) {
-    sz += sizeof(gctrack_event_t);
+  if (!gctracker_enabled()) {
+    return;
   }
-  return sz;
-}
-
-static const rb_data_type_t gctrack_hook_data_type = {
-  "gctrack_hook_data",
-  { hook_data_mark, hook_data_free, hook_data_memsize },
-  0, 0, RUBY_TYPED_FREE_IMMEDIATELY
-};
-
-static gctrack_event_t * alloc_event(gctrack_hook_data_t *data, bool *first)
-{
-  gctrack_event_t *ev = (gctrack_event_t *) calloc(1, sizeof(gctrack_event_t));
-  *first = false;
-  if (!data->events) {
-    data->events = ev;
-    *first = true;
-  } else {
-    gctrack_event_t *cur = data->events;
-    while (cur) {
-      if (cur->next == NULL) {
-        cur->next = ev;
-        break;
-      } else {
-        cur = cur->next;
-      }
+  rb_trace_arg_t *tparg = rb_tracearg_from_tracepoint(tpval);
+  switch (rb_tracearg_event_flag(tparg)) {
+    case RUBY_INTERNAL_EVENT_GC_ENTER: {
+      last_enter = nanotime();
     }
+      break;
+    case RUBY_INTERNAL_EVENT_GC_EXIT: {
+      if (last_enter) {
+        add_gc_cycle(nanotime() - last_enter);
+      }
+      last_enter = 0;
+    }
+      break;
   }
-  return ev;
 }
 
 static void
-flush_gc_events(void *arg)
+create_tracepoint() 
 {
-  gctrack_hook_data_t *hook_data = arg;
-
-  // TODO: convert gctrack_events to ruby array for the callback
-  rb_proc_call(hook_data->proc, rb_ary_new());
-}
-
-static void
-gc_event_hook(rb_event_flag_t event, VALUE data, VALUE self, ID id, VALUE klass)
-{
-  gctrack_hook_data_t *hook_data;
-  gctrack_event_t *ev;
-  bool first = false;
-
-  TypedData_Get_Struct(data, gctrack_hook_data_t, &gctrack_hook_data_type, hook_data);
-  ev = alloc_event(hook_data, &first);
-
-  clock_gettime(CLOCK_MONOTONIC_RAW, &ev->ts);
-  ev->ev = event;
-
-  if (first) {
-    rb_postponed_job_register(0, flush_gc_events, hook_data);
+  rb_event_flag_t events;
+  events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
+  tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
+  if (NIL_P(tracepoint)) {
+    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't create tracepoint!");
   }
+  rb_global_variable(&tracepoint);
 }
 
 static VALUE
-enable(int argc, VALUE *argv, VALUE klass)
+gctracker_start_record(int argc, VALUE *argv, VALUE klass)
 {
-  gctrack_hook_data_t *data;
-  VALUE obj;
-  VALUE opts;
-  VALUE ctx = Qnil;
-
-  rb_event_flag_t events = RUBY_INTERNAL_EVENT_GC_ENTER |
-    RUBY_INTERNAL_EVENT_GC_EXIT;
-
-  if (enabled) {
+  if(!gctracker_enabled()) {
     return Qfalse;
   }
 
-  if (!rb_block_given_p()) {
-    rb_raise(rb_eArgError, "called without a block");
+  record_t *record = (record_t *) calloc(1, sizeof(record_t));
+  if (!record) {
+    return Qfalse;
+  }
+  
+  record->parent = last_record;
+  last_record = record;
+  return Qtrue;
+}
+
+static VALUE
+gctracker_end_record(int argc, VALUE *argv, VALUE klass)
+{
+  if (!last_record) {
+    return Qnil;
+  } 
+  record_t *record = last_record;
+  last_record = record->parent;
+  
+  VALUE stats = rb_ary_new2(2);
+  rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
+  rb_ary_store(stats, 1, ULONG2NUM(record->duration));
+
+  free(record);  
+
+  return stats;
+}
+
+static VALUE
+gctracker_enable(int argc, VALUE *argv, VALUE klass)
+{
+  if (NIL_P(tracepoint)) {
+    create_tracepoint();
   }
 
-  rb_scan_args(argc, argv, ":", &opts);
-  if (!NIL_P(opts)) {
-    ID keys[2];
-    VALUE values[2];
-
-    keys[0] = rb_intern("context");
-    keys[1] = rb_intern("events");
-    rb_get_kwargs(opts, keys, 0, 2, values);
-    if (values[0] != Qundef) {
-      ctx = values[0];
-    }
+  if (gctracker_enabled()) {
+    return Qtrue;
   }
 
-  obj = TypedData_Make_Struct(klass, gctrack_hook_data_t, &gctrack_hook_data_type, data);
-  data->proc = rb_block_proc();
-  data->ctx = ctx;
-  data->events = NULL;
-
-  rb_add_event_hook(gc_event_hook, events, obj);
-
-  enabled = true;
+  rb_tracepoint_enable(tracepoint);
+  if (!gctracker_enabled()) {
+    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't enable tracepoint!");
+  }
 
   return Qtrue;
 }
 
 static VALUE
-disable(VALUE self)
+gctracker_disable(VALUE self)
 {
-  if (!enabled) {
+  if (!gctracker_enabled()) {
     return Qfalse;
   }
 
-  int ret = rb_remove_event_hook(gc_event_hook);
-  if (ret != 1) {
-    rb_raise(rb_eRuntimeError, "error removing event hook: %d", ret);
+  rb_tracepoint_disable(tracepoint);
+  if (gctracker_enabled()) {
+    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't disable tracepoint!");
+  } 
+
+  while (last_record) {
+    record_t *record = last_record;
+    last_record = record->parent;
+    free(record);
   }
-
-  enabled = false;
-
+  last_record = NULL;
+  
   return Qtrue;
 }
 
@@ -178,10 +160,11 @@ void
 Init_gctrack()
 {
   VALUE mGC = rb_define_module("GC");
-  cTracker = rb_define_class_under(mGC, "Tracker", rb_cData);
+  VALUE cTracker = rb_define_module_under(mGC, "Tracker");
 
-  rb_define_singleton_method(cTracker, "enable", enable, -1);
-  rb_define_singleton_method(cTracker, "disable", disable, 0);
+  rb_define_module_function(cTracker, "enable", gctracker_enable, 0);
+  rb_define_module_function(cTracker, "disable", gctracker_disable, 0);
 
-  idCall = rb_intern("call");
+  rb_define_module_function(cTracker, "start_record", gctracker_start_record, 0);
+  rb_define_module_function(cTracker, "end_record", gctracker_end_record, 0);
 }
