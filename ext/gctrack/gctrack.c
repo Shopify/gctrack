@@ -70,16 +70,17 @@ gctracker_hook(VALUE tpval, void *data)
   }
 }
 
-static void
+static bool
 create_tracepoint() 
 {
   rb_event_flag_t events;
   events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
   tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
   if (NIL_P(tracepoint)) {
-    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't create tracepoint!");
+    return false;
   }
   rb_global_variable(&tracepoint);
+  return true;
 }
 
 static VALUE
@@ -125,12 +126,14 @@ gctracker_enable(int argc, VALUE *argv, VALUE klass)
   }
 
   if (NIL_P(tracepoint)) {
-    create_tracepoint();
+    if(!create_tracepoint()) {
+      return Qfalse;
+    }
   }
 
   rb_tracepoint_enable(tracepoint);
   if (!gctracker_enabled()) {
-    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't enable tracepoint!");
+    return Qfalse;
   }
 
   return Qtrue;
