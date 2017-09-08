@@ -49,13 +49,15 @@ gctracker_enabled()
 static void 
 gctracker_hook(VALUE tpval, void *data)
 {
-  if (!gctracker_enabled()) {
+  if (!gctracker_enabled() && !last_record) {
     return;
   }
   rb_trace_arg_t *tparg = rb_tracearg_from_tracepoint(tpval);
   switch (rb_tracearg_event_flag(tparg)) {
     case RUBY_INTERNAL_EVENT_GC_ENTER: {
-      last_enter = nanotime();
+      if (gctracker_enabled()) {
+        last_enter = nanotime();
+      }
     }
       break;
     case RUBY_INTERNAL_EVENT_GC_EXIT: {
@@ -118,12 +120,12 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
 static VALUE
 gctracker_enable(int argc, VALUE *argv, VALUE klass)
 {
-  if (NIL_P(tracepoint)) {
-    create_tracepoint();
-  }
-
   if (gctracker_enabled()) {
     return Qtrue;
+  }
+
+  if (NIL_P(tracepoint)) {
+    create_tracepoint();
   }
 
   rb_tracepoint_enable(tracepoint);
@@ -145,13 +147,6 @@ gctracker_disable(VALUE self)
   if (gctracker_enabled()) {
     rb_raise(rb_eRuntimeError, "GCTracker: Couldn't disable tracepoint!");
   } 
-
-  while (last_record) {
-    record_t *record = last_record;
-    last_record = record->parent;
-    free(record);
-  }
-  last_record = NULL;
   
   return Qtrue;
 }

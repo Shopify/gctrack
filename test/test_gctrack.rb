@@ -51,10 +51,12 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.end_record.nil?
   end
 
-  def test_no_data_for_started_records_on_disable
+  def test_data_for_started_records_on_disable
     assert GC::Tracker.enable
     assert GC::Tracker.start_record
     assert GC::Tracker.disable
+    assert !GC::Tracker.start_record
+    assert !GC::Tracker.end_record.nil?
     assert GC::Tracker.end_record.nil?
   ensure
     GC::Tracker.disable
