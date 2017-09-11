@@ -51,6 +51,14 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.end_record.nil?
   end
 
+  def test_enabled_returns_accrodingly
+    assert !GC::Tracker.enabled?
+    GC::Tracker.enable
+    assert GC::Tracker.enabled?
+  ensure
+    GC::Tracker.disable
+  end
+
   def test_data_for_started_records_on_disable
     assert GC::Tracker.enable
     assert GC::Tracker.start_record

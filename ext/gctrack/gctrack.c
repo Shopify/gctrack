@@ -118,6 +118,12 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   return stats;
 }
 
+static VALUE 
+gctracker_enabled_p(int argc, VALUE *argv, VALUE klass)
+{
+  return gctracker_enabled() ? Qtrue : Qfalse;
+}
+
 static VALUE
 gctracker_enable(int argc, VALUE *argv, VALUE klass)
 {
@@ -161,6 +167,7 @@ Init_gctrack()
   VALUE cTracker = rb_define_module_under(mGC, "Tracker");
 
   rb_define_module_function(cTracker, "enable", gctracker_enable, 0);
+  rb_define_module_function(cTracker, "enabled?", gctracker_enabled_p, 0);
   rb_define_module_function(cTracker, "disable", gctracker_disable, 0);
 
   rb_define_module_function(cTracker, "start_record", gctracker_start_record, 0);
