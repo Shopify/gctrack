@@ -49,13 +49,15 @@ gctracker_enabled()
 static void 
 gctracker_hook(VALUE tpval, void *data)
 {
-  if (!gctracker_enabled()) {
+  if (!gctracker_enabled() && !last_record) {
     return;
   }
   rb_trace_arg_t *tparg = rb_tracearg_from_tracepoint(tpval);
   switch (rb_tracearg_event_flag(tparg)) {
     case RUBY_INTERNAL_EVENT_GC_ENTER: {
-      last_enter = nanotime();
+      if (gctracker_enabled()) {
+        last_enter = nanotime();
+      }
     }
       break;
     case RUBY_INTERNAL_EVENT_GC_EXIT: {
@@ -68,16 +70,17 @@ gctracker_hook(VALUE tpval, void *data)
   }
 }
 
-static void
+static bool
 create_tracepoint() 
 {
   rb_event_flag_t events;
   events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
   tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
   if (NIL_P(tracepoint)) {
-    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't create tracepoint!");
+    return false;
   }
   rb_global_variable(&tracepoint);
+  return true;
 }
 
 static VALUE
@@ -115,20 +118,28 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   return stats;
 }
 
+static VALUE 
+gctracker_enabled_p(int argc, VALUE *argv, VALUE klass)
+{
+  return gctracker_enabled() ? Qtrue : Qfalse;
+}
+
 static VALUE
 gctracker_enable(int argc, VALUE *argv, VALUE klass)
 {
-  if (NIL_P(tracepoint)) {
-    create_tracepoint();
-  }
-
   if (gctracker_enabled()) {
     return Qtrue;
   }
 
+  if (NIL_P(tracepoint)) {
+    if(!create_tracepoint()) {
+      return Qfalse;
+    }
+  }
+
   rb_tracepoint_enable(tracepoint);
   if (!gctracker_enabled()) {
-    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't enable tracepoint!");
+    return Qfalse;
   }
 
   return Qtrue;
@@ -138,20 +149,13 @@ static VALUE
 gctracker_disable(VALUE self)
 {
   if (!gctracker_enabled()) {
-    return Qfalse;
+    return Qtrue;
   }
 
   rb_tracepoint_disable(tracepoint);
   if (gctracker_enabled()) {
-    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't disable tracepoint!");
+    return Qfalse;
   } 
-
-  while (last_record) {
-    record_t *record = last_record;
-    last_record = record->parent;
-    free(record);
-  }
-  last_record = NULL;
   
   return Qtrue;
 }
@@ -163,6 +167,7 @@ Init_gctrack()
   VALUE cTracker = rb_define_module_under(mGC, "Tracker");
 
   rb_define_module_function(cTracker, "enable", gctracker_enable, 0);
+  rb_define_module_function(cTracker, "enabled?", gctracker_enabled_p, 0);
   rb_define_module_function(cTracker, "disable", gctracker_disable, 0);
 
   rb_define_module_function(cTracker, "start_record", gctracker_start_record, 0);
