@@ -149,12 +149,12 @@ static VALUE
 gctracker_disable(VALUE self)
 {
   if (!gctracker_enabled()) {
-    return Qfalse;
+    return Qtrue;
   }
 
   rb_tracepoint_disable(tracepoint);
   if (gctracker_enabled()) {
-    rb_raise(rb_eRuntimeError, "GCTracker: Couldn't disable tracepoint!");
+    return Qfalse;
   } 
   
   return Qtrue;

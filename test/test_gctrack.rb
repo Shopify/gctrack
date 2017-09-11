@@ -9,13 +9,9 @@ class TestGctrack < Test::Unit::TestCase
   end
 
   def test_disable
-    assert !GC::Tracker.disable
+    assert GC::Tracker.disable
     assert GC::Tracker.enable
     assert GC::Tracker.disable
-  end
-
-  def test_returns_false_when_not_enabled
-    assert_equal false, GC::Tracker.disable
   end
 
   def test_enabled_generates_events
