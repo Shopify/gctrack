@@ -19,6 +19,8 @@ gem 'gctrack', '~> 0.0.1'
 #### #2 Enable the extension
 
 ```ruby
+require 'gctrack'
+
 GC::Tracker.enable # returns true, if the Tracker is now enabled
 ```
 

@@ -1,5 +1,5 @@
 require 'test/unit'
-require 'gctrack/gctrack'
+require 'gctrack'
 
 class TestGctrack < Test::Unit::TestCase
   def test_enable
