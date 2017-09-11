@@ -128,9 +128,9 @@ gctracker_start_record(int argc, VALUE *argv, VALUE klass)
  * Ends the recording of the last started record and return the 
  * the collected information. 
  * The array contains two numbers: The amount of GC cycles observed and 
- * the cumulative duration of these cycles. If multiple recordings were started
- * they will be be popped from the stack of records and their values will be 
- * returned. 
+ * the cumulative duration in nanoseconds of these cycles. If multiple recordings
+ * were started they will be be popped from the stack of records and their 
+ * values will be returned. 
  * GC data gathered is in all records of the stack. 
  *
  *    GC::Tracker.start_record  # true
@@ -163,8 +163,7 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
  * call-seq:
  *    GC::Tracker.enabled?  -> true or false
  *
- * Globally enables the tracker. Returns +true+ if the Tracker is 
- * enabled after this call (whether it enabled it or not), +false+ otherwise.
+ * Returns +true+ if the Tracker is enabled, +false+ otherwise.
  *
  *    GC::Tracker.enabled?  # false
  *    GC::Tracker.enable    # true
@@ -181,7 +180,8 @@ gctracker_enabled_p(int argc, VALUE *argv, VALUE klass)
  * call-seq:
  *    GC::Tracker.enable   -> true or false
  *
- * Returns +true+ if the Tracker has been enabled, +false+ otherwise.
+ * Globally enables the tracker. Returns +true+ if the Tracker is 
+ * enabled after this call (whether it enabled it or not), +false+ otherwise.
  *
  *    GC::Tracker.disable   # true
  *    GC::Tracker.enabled?  # false
