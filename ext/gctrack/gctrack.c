@@ -83,6 +83,27 @@ create_tracepoint()
   return true;
 }
 
+/*
+ * call-seq:
+ *    GC::Tracker.start_record  -> true or false
+ *
+ * Starts recording GC cycles and their duration. Returns +true+ if the 
+ * recording was started, +false+ otherwise. If the record could be started
+ * an GC::Tracker#end_record invocation will always return data for the record, 
+ * otherwise that invocation would return +nil+.
+ * One case where +false+ would be returned is if the Tracker isn't enabled.
+ * #start_record can be nested. These records will have a parent-child relationship,
+ * where the parent will contain all GC data of the child.
+ *
+ *    GC::Tracker.enabled?      # true
+ *    GC::Tracker.start_record  # true
+ *    GC::Tracker.start_record  # true
+ *    GC::Tracker.end_record    # [2, 12654] from the second #start_record
+ *    GC::Tracker.disable       # true
+ *    GC::Tracker.start_record  # false
+ *    GC::Tracker.end_record    # [3, 15782] from the first #start_record, contains the data from the first record
+ *    GC::Tracker.end_record    # nil from the last #start_record, that returned false
+ */
 static VALUE
 gctracker_start_record(int argc, VALUE *argv, VALUE klass)
 {
@@ -100,6 +121,26 @@ gctracker_start_record(int argc, VALUE *argv, VALUE klass)
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ *    GC::Tracker.end_record  -> Array or nil
+ *
+ * Ends the recording of the last started record and return the 
+ * the collected information. 
+ * The array contains two numbers: The amount of GC cycles observed and 
+ * the cumulative duration in nanoseconds of these cycles. If multiple recordings
+ * were started they will be be popped from the stack of records and their 
+ * values will be returned. 
+ * GC data gathered is in all records of the stack. 
+ *
+ *    GC::Tracker.start_record  # true
+ *    GC::Tracker.start_record  # true
+ *    GC::Tracker.end_record    # [2, 12654] amount of cycles and duration since the second #start_record
+ *    GC::Tracker.end_record    # [3, 15782] GC data since the first #start_record, including the data above
+ *    GC::Tracker.disable       # true
+ *    GC::Tracker.start_record  # false
+ *    GC::Tracker.end_record    # nil
+ */
 static VALUE
 gctracker_end_record(int argc, VALUE *argv, VALUE klass)
 {
@@ -118,12 +159,35 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   return stats;
 }
 
+/*
+ * call-seq:
+ *    GC::Tracker.enabled?  -> true or false
+ *
+ * Returns +true+ if the Tracker is enabled, +false+ otherwise.
+ *
+ *    GC::Tracker.enabled?  # false
+ *    GC::Tracker.enable    # true
+ *    GC::Tracker.enabled?  # true
+ *    GC::Tracker.enable    # true
+ */
 static VALUE 
 gctracker_enabled_p(int argc, VALUE *argv, VALUE klass)
 {
   return gctracker_enabled() ? Qtrue : Qfalse;
 }
 
+/*
+ * call-seq:
+ *    GC::Tracker.enable   -> true or false
+ *
+ * Globally enables the tracker. Returns +true+ if the Tracker is 
+ * enabled after this call (whether it enabled it or not), +false+ otherwise.
+ *
+ *    GC::Tracker.disable   # true
+ *    GC::Tracker.enabled?  # false
+ *    GC::Tracker.enable    # true
+ *    GC::Tracker.enabled?  # true
+ */
 static VALUE
 gctracker_enable(int argc, VALUE *argv, VALUE klass)
 {
@@ -145,6 +209,18 @@ gctracker_enable(int argc, VALUE *argv, VALUE klass)
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ *    GC::Tracker.disable   -> true or false
+ *
+ * Globally disables the tracker. Returns +true+ if the Tracker is 
+ * disabled after this call (whether it disabled it or not), +false+ otherwise.
+ *
+ *    GC::Tracker.enabled?  # true
+ *    GC::Tracker.disable   # true
+ *    GC::Tracker.enabled?  # false
+ *    GC::Tracker.disable   # true
+ */
 static VALUE
 gctracker_disable(VALUE self)
 {
