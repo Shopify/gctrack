@@ -6,11 +6,14 @@
 #include <time.h>
 #include <stdlib.h>
 
+static VALUE s_total_allocated_objects;
+
 typedef struct record_t record_t;
 
 struct record_t {
   uint32_t cycles;
   uint64_t duration;
+  size_t allocations;
   record_t *parent;
 };
 
@@ -118,6 +121,7 @@ gctracker_start_record(int argc, VALUE *argv, VALUE klass)
   
   record->parent = last_record;
   last_record = record;
+  last_record->allocations = rb_gc_stat(s_total_allocated_objects);
   return Qtrue;
 }
 
@@ -150,9 +154,10 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   record_t *record = last_record;
   last_record = record->parent;
   
-  VALUE stats = rb_ary_new2(2);
+  VALUE stats = rb_ary_new2(3);
   rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
   rb_ary_store(stats, 1, ULONG2NUM(record->duration));
+  rb_ary_store(stats, 2, SIZET2NUM(rb_gc_stat(s_total_allocated_objects) - record->allocations));
 
   free(record);  
 
@@ -239,6 +244,8 @@ gctracker_disable(VALUE self)
 void
 Init_gctrack()
 {
+  s_total_allocated_objects = ID2SYM(rb_intern("total_allocated_objects"));
+
   VALUE mGC = rb_define_module("GC");
   VALUE cTracker = rb_define_module_under(mGC, "Tracker");
 

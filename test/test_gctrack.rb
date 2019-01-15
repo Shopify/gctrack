@@ -14,13 +14,26 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.disable
   end
 
+  def test_records_allocations
+    assert GC::Tracker.enable
+    assert GC::Tracker.start_record
+    _, _, first_alloc = GC::Tracker.end_record
+    assert GC::Tracker.start_record
+    _ = [1, 2, 3] # the values shouldn't allocate anything
+    _, _, second_alloc = GC::Tracker.end_record
+    assert second_alloc == first_alloc + 1
+  ensure
+    GC::Tracker.disable
+  end
+
   def test_enabled_generates_events
     assert GC::Tracker.enable
     assert GC::Tracker.start_record
     GC.start
-    cycles, duration = GC::Tracker.end_record
+    cycles, duration, allocations = GC::Tracker.end_record
     assert cycles > 0
     assert duration > 0
+    assert allocations > 0
   ensure
     GC::Tracker.disable
   end
@@ -34,10 +47,12 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.start_record
     a = "a"
     10.times { |i| a += a * i }
-    cycles_c, duration_c = GC::Tracker.end_record
-    cycles_p, duration_p = GC::Tracker.end_record
+    cycles_c, duration_c, allocations_c = GC::Tracker.end_record
+    _ = [1, 2, 3]
+    cycles_p, duration_p, allocations_p = GC::Tracker.end_record
     assert cycles_p > cycles_c
     assert duration_p > duration_c
+    assert allocations_p == allocations_c * 2 + 1
   ensure
     GC::Tracker.disable
   end
