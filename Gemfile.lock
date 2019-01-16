@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    gctrack (0.1.0)
+    gctrack (0.2.0)
 
 GEM
   remote: https://rubygems.org/
@@ -37,4 +37,4 @@ DEPENDENCIES
   test-unit
 
 BUNDLED WITH
-   1.15.3
+   1.17.3

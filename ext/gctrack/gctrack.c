@@ -101,10 +101,10 @@ create_tracepoint()
  *    GC::Tracker.enabled?      # true
  *    GC::Tracker.start_record  # true
  *    GC::Tracker.start_record  # true
- *    GC::Tracker.end_record    # [2, 12654] from the second #start_record
+ *    GC::Tracker.end_record    # [2, 12654, 254] from the second #start_record
  *    GC::Tracker.disable       # true
  *    GC::Tracker.start_record  # false
- *    GC::Tracker.end_record    # [3, 15782] from the first #start_record, contains the data from the first record
+ *    GC::Tracker.end_record    # [3, 15782, 537] from the first #start_record, contains the data from the first record
  *    GC::Tracker.end_record    # nil from the last #start_record, that returned false
  */
 static VALUE
@@ -131,16 +131,16 @@ gctracker_start_record(int argc, VALUE *argv, VALUE klass)
  *
  * Ends the recording of the last started record and return the 
  * the collected information. 
- * The array contains two numbers: The amount of GC cycles observed and 
- * the cumulative duration in nanoseconds of these cycles. If multiple recordings
- * were started they will be be popped from the stack of records and their 
+ * The array contains three numbers: The amount of GC cycles observed,
+ * the cumulative duration in nanoseconds of these cycles and the amount of objects allocated. 
+ * If multiple recordings were started they will be be popped from the stack of records and their 
  * values will be returned. 
  * GC data gathered is in all records of the stack. 
  *
  *    GC::Tracker.start_record  # true
  *    GC::Tracker.start_record  # true
- *    GC::Tracker.end_record    # [2, 12654] amount of cycles and duration since the second #start_record
- *    GC::Tracker.end_record    # [3, 15782] GC data since the first #start_record, including the data above
+ *    GC::Tracker.end_record    # [2, 12654, 34534] amount of GC cycles and duration as well as objects allocated since the second #start_record
+ *    GC::Tracker.end_record    # [3, 15782, 35678] GC data & allocations since the first #start_record, including the data above
  *    GC::Tracker.disable       # true
  *    GC::Tracker.start_record  # false
  *    GC::Tracker.end_record    # nil

@@ -13,7 +13,7 @@ GCTrack is published to [rubygems.org](https://rubygems.org/gems/gctrack).
 Simply add it as a dependency to your `Gemfile`
 
 ```ruby
-gem 'gctrack', '~> 0.1.0'
+gem 'gctrack', '~> 0.2.0'
 ```
 
 #### #2 Enable the extension
@@ -29,11 +29,12 @@ GC::Tracker.enable # returns true, if the Tracker is now enabled
 ```ruby
 GC::Tracker.start_record # returns true, if a new record was started
 # DO ACTUAL WORK
-gc_cycles, gc_duration_ns = GC::Tracker.end_record
+gc_cycles, gc_duration_ns, object_allocations = GC::Tracker.end_record
 ```
 
 `#end_record` will return the `gc_cycles` (the amount of gc cycles observed) and `gc_duration_ns` (their cumulative duration in 
-nanoseconds), since the last invocation of `#start_record`. You can also invoke `#start_record` recursively as so:
+nanoseconds), `object_allocations` is the number of object creations, since the last invocation of `#start_record`. 
+You can also invoke `#start_record` recursively as so:
 
 ```ruby
 GC::Tracker.start_record # Start a first record 
