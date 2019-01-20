@@ -65,5 +65,15 @@ class TestGctrack < Test::Unit::TestCase
   ensure
     GC::Tracker.disable
   end
+
+  def test_allocations
+    assert GC::Tracker.enable
+    assert GC::Tracker.start_record
+    omg = "10" * 10
+    record = GC::Tracker.end_record
+    assert GC::Tracker.disable
+
+    p record
+  end
 end
 
