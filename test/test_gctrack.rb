@@ -34,11 +34,13 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.start_record
     a = "a"
     10.times { |i| a += a * i }
-    cycles_c, duration_c, allocs_c = GC::Tracker.end_record
-    cycles_p, duration_p, allocs_p = GC::Tracker.end_record
+    cycles_c, duration_c, allocs_c, ctx_switches, memory = GC::Tracker.end_record
+    cycles_p, duration_p, allocs_p, ctx_switches, memory = GC::Tracker.end_record
     assert cycles_p > cycles_c
     assert duration_p > duration_c
     assert allocs_p > allocs_c
+    assert ctx_switches
+    assert memory
   ensure
     GC::Tracker.disable
   end
