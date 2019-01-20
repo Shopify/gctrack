@@ -29,11 +29,15 @@ GC::Tracker.enable # returns true, if the Tracker is now enabled
 ```ruby
 GC::Tracker.start_record # returns true, if a new record was started
 # DO ACTUAL WORK
-gc_cycles, gc_duration_ns = GC::Tracker.end_record
+gc_cycles, gc_duration_ns, rb_allocations, rb_thread_ctx_switches = GC::Tracker.end_record
 ```
 
-`#end_record` will return the `gc_cycles` (the amount of gc cycles observed) and `gc_duration_ns` (their cumulative duration in 
-nanoseconds), since the last invocation of `#start_record`. You can also invoke `#start_record` recursively as so:
+`#end_record` will return the `gc_cycles` (the amount of gc cycles observed) and
+`gc_duration_ns` (their cumulative duration in nanoseconds), since the last
+invocation of `#start_record`. It will also return `rb_allocation`, the number
+of objects allocated and `rb_thread_ctx_switches` the number of times Ruby
+switched between threads during the recording. You can also invoke
+`#start_record` recursively as so:
 
 ```ruby
 GC::Tracker.start_record # Start a first record 

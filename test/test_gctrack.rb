@@ -34,10 +34,12 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.start_record
     a = "a"
     10.times { |i| a += a * i }
-    cycles_c, duration_c = GC::Tracker.end_record
-    cycles_p, duration_p = GC::Tracker.end_record
+    cycles_c, duration_c, allocs_c, ctx_switches = GC::Tracker.end_record
+    cycles_p, duration_p, allocs_p, ctx_switches = GC::Tracker.end_record
     assert cycles_p > cycles_c
     assert duration_p > duration_c
+    assert allocs_p > allocs_c
+    assert ctx_switches
   ensure
     GC::Tracker.disable
   end
@@ -64,6 +66,15 @@ class TestGctrack < Test::Unit::TestCase
     assert GC::Tracker.end_record.nil?
   ensure
     GC::Tracker.disable
+  end
+
+  def test_allocations
+    assert GC::Tracker.enable
+    assert GC::Tracker.start_record
+    omg = "10" * 10
+    _cycles, _duration, allocs, _ctx_switches = GC::Tracker.end_record
+    assert allocs > 10
+    assert GC::Tracker.disable
   end
 end
 

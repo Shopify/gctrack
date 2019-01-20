@@ -11,6 +11,8 @@ typedef struct record_t record_t;
 struct record_t {
   uint32_t cycles;
   uint64_t duration;
+  uint64_t context_switch;
+  uint64_t allocations;
   record_t *parent;
 };
 
@@ -36,6 +38,26 @@ add_gc_cycle(uint64_t duration)
   while (record) {
     record->cycles = record->cycles + 1;
     record->duration = record->duration + duration;
+    record = record->parent;
+  }
+}
+
+static void
+add_allocations()
+{
+  record_t *record = last_record;
+  while (record) {
+    record->allocations += 1;
+    record = record->parent;
+  }
+}
+
+static void
+add_context_switch()
+{
+  record_t *record = last_record;
+  while (record) {
+    record->context_switch += 1;
     record = record->parent;
   }
 }
@@ -67,6 +89,19 @@ gctracker_hook(VALUE tpval, void *data)
       last_enter = 0;
     }
       break;
+    case RUBY_INTERNAL_EVENT_NEWOBJ: {
+      if (gctracker_enabled() && last_record) {
+
+        add_allocations();
+      }
+    }
+      break;
+    case RUBY_INTERNAL_EVENT_SWITCH: {
+      if (gctracker_enabled() && last_record) {
+        add_context_switch();
+      }
+    }
+      break;
   }
 }
 
@@ -74,7 +109,8 @@ static bool
 create_tracepoint() 
 {
   rb_event_flag_t events;
-  events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
+  events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT |
+    RUBY_INTERNAL_EVENT_SWITCH | RUBY_INTERNAL_EVENT_NEWOBJ;
   tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
   if (NIL_P(tracepoint)) {
     return false;
@@ -149,10 +185,12 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   } 
   record_t *record = last_record;
   last_record = record->parent;
-  
-  VALUE stats = rb_ary_new2(2);
+
+  VALUE stats = rb_ary_new2(4);
   rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
   rb_ary_store(stats, 1, ULONG2NUM(record->duration));
+  rb_ary_store(stats, 2, ULONG2NUM(record->allocations));
+  rb_ary_store(stats, 3, ULONG2NUM(record->context_switch));
 
   free(record);  
 
