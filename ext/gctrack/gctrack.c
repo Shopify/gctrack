@@ -42,6 +42,16 @@ add_gc_cycle(uint64_t duration)
   }
 }
 
+static inline void
+add_one(uint64_t * reference)
+{
+  record_t *record = last_record;
+  while (record) {
+    *reference += 1;
+    record = record->parent;
+  }
+}
+
 static inline bool 
 gctracker_enabled() 
 {
@@ -69,14 +79,18 @@ gctracker_hook(VALUE tpval, void *data)
       last_enter = 0;
     }
       break;
-    case RUBY_INTERNAL_EVENT_SWITCH:
+    case RUBY_INTERNAL_EVENT_NEWOBJ: {
       if (gctracker_enabled() && last_record) {
-        last_record->context_switch += 1;
+        add_one(&last_record->allocations);
       }
-    case RUBY_INTERNAL_EVENT_NEWOBJ:
+    }
+      break;
+    case RUBY_INTERNAL_EVENT_SWITCH: {
       if (gctracker_enabled() && last_record) {
-        last_record->allocations += 1;
+        add_one(&last_record->context_switch);
       }
+    }
+      break;
   }
 }
 
