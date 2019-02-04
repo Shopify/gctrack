@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'gctrack'
-  s.version = '0.1.0'
+  s.version = '0.1.1'
   s.summary = 'Track Ruby GC events'
   s.description = <<-DOC
     This gem can be used to track Ruby GC tracepoints that are normally only visible through GC extensions.
