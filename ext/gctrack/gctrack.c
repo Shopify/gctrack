@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 /* https://github.com/ko1/allocation_tracer/blob/master/ext/allocation_tracer/allocation_tracer.c */
-size_t rb_obj_memsize_of(VALUE obj);  /* gc.c */
+/* size_t rb_obj_memsize_of(VALUE obj);  /1* gc.c *1/ */
 
 typedef struct record_t record_t;
 
@@ -16,7 +16,7 @@ struct record_t {
   uint64_t duration;
   uint64_t context_switch;
   uint64_t allocations;
-  uint64_t memory;
+  /* uint64_t memory; */
   record_t *parent;
 };
 
@@ -66,15 +66,15 @@ add_context_switch()
   }
 }
 
-static void
-add_memory(size_t memory)
-{
-  record_t *record = last_record;
-  while (record) {
-    record->memory += memory;
-    record = record->parent;
-  }
-}
+/* static void */
+/* add_memory(size_t memory) */
+/* { */
+/*   record_t *record = last_record; */
+/*   while (record) { */
+/*     record->memory += memory; */
+/*     record = record->parent; */
+/*   } */
+/* } */
 
 static inline bool 
 gctracker_enabled() 
@@ -116,13 +116,13 @@ gctracker_hook(VALUE tpval, void *data)
       }
     }
       break;
-    case RUBY_INTERNAL_EVENT_FREEOBJ: {
-      if (gctracker_enabled() && last_record) {
-        VALUE obj = rb_tracearg_object(tparg);
-        add_memory(rb_obj_memsize_of(obj));
-      }
-    }
-      break;
+    /* case RUBY_INTERNAL_EVENT_FREEOBJ: { */
+    /*   if (gctracker_enabled() && last_record) { */
+    /*     VALUE obj = rb_tracearg_object(tparg); */
+    /*     add_memory(rb_obj_memsize_of(obj)); */
+    /*   } */
+    /* } */
+    /*   break; */
   }
 }
 
@@ -131,7 +131,7 @@ create_tracepoint()
 {
   rb_event_flag_t events;
   events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT |
-    RUBY_INTERNAL_EVENT_SWITCH | RUBY_INTERNAL_EVENT_NEWOBJ | RUBY_INTERNAL_EVENT_FREEOBJ;
+    RUBY_INTERNAL_EVENT_SWITCH | RUBY_INTERNAL_EVENT_NEWOBJ;
   tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
   if (NIL_P(tracepoint)) {
     return false;
@@ -207,12 +207,12 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   record_t *record = last_record;
   last_record = record->parent;
 
-  VALUE stats = rb_ary_new2(5);
+  VALUE stats = rb_ary_new2(4);
   rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
   rb_ary_store(stats, 1, ULONG2NUM(record->duration));
   rb_ary_store(stats, 2, ULONG2NUM(record->allocations));
   rb_ary_store(stats, 3, ULONG2NUM(record->context_switch));
-  rb_ary_store(stats, 4, ULONG2NUM(record->memory));
+  /* rb_ary_store(stats, 4, ULONG2NUM(record->memory)); */
 
   free(record);  
 
