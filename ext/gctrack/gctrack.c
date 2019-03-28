@@ -6,18 +6,31 @@
 #include <time.h>
 #include <stdlib.h>
 
+uint32_t HAD_MARK  = 1 << 31;
+uint32_t HAD_SWEEP = 1 << 30;
+uint32_t IS_MARK   = 1 << 29;
+
 typedef struct record_t record_t;
 
 struct record_t {
   uint32_t cycles;
   uint64_t duration;
+  uint64_t mark_duration;
+  uint64_t sweep_duration;
   record_t *parent;
 };
+
+struct gc_cycle_t {
+  uint64_t last_enter;
+  uint32_t flags;
+};
+
+static struct gc_cycle_t previous_cycle;
+static struct gc_cycle_t current_cycle;
 
 static VALUE tracepoint = Qnil;
 
 static record_t *last_record = NULL;
-static uint64_t last_enter = 0;
 
 static uint64_t 
 nanotime()
@@ -52,15 +65,40 @@ gctracker_hook(VALUE tpval, void *data)
   switch (rb_tracearg_event_flag(tparg)) {
     case RUBY_INTERNAL_EVENT_GC_ENTER: {
       if (gctracker_enabled()) {
-        last_enter = nanotime();
+        current_cycle.last_enter = nanotime();
+        current_cycle.flags = previous_cycle.flags & IS_MARK;        
       }
     }
       break;
     case RUBY_INTERNAL_EVENT_GC_EXIT: {
-      if (last_enter) {
-        add_gc_cycle(nanotime() - last_enter);
+      uint64_t duration = nanotime() - current_cycle.last_enter;
+      if (current_cycle.last_enter) {
+        add_gc_cycle(duration);
       }
-      last_enter = 0;
+
+      if ((current_cycle.flags & (HAD_MARK | HAD_SWEEP)) == (HAD_MARK | HAD_SWEEP)) {
+        // Do not record this time
+      } else if ((current_cycle.flags & HAD_MARK) == HAD_MARK) {
+        last_record->mark_duration += duration;
+      } else if ((current_cycle.flags & HAD_SWEEP) == HAD_SWEEP) {
+        last_record->sweep_duration += duration;
+      } else if ((current_cycle.flags & IS_MARK) == IS_MARK) {
+        last_record->mark_duration += duration;
+      } else {
+        last_record->sweep_duration += duration;
+      }
+      current_cycle.last_enter = 0;
+      previous_cycle = current_cycle;
+    }
+      break;
+    case RUBY_INTERNAL_EVENT_GC_END_MARK: {
+      current_cycle.flags |= HAD_MARK;
+      current_cycle.flags &= ~IS_MARK;
+    }
+      break;
+    case RUBY_INTERNAL_EVENT_GC_END_SWEEP: {
+      current_cycle.flags |= HAD_SWEEP;
+      current_cycle.flags |= IS_MARK;
     }
       break;
   }
@@ -70,7 +108,10 @@ static bool
 create_tracepoint() 
 {
   rb_event_flag_t events;
-  events = RUBY_INTERNAL_EVENT_GC_ENTER | RUBY_INTERNAL_EVENT_GC_EXIT;
+  events = RUBY_INTERNAL_EVENT_GC_ENTER | 
+    RUBY_INTERNAL_EVENT_GC_EXIT | 
+    RUBY_INTERNAL_EVENT_GC_END_MARK |
+    RUBY_INTERNAL_EVENT_GC_END_SWEEP;
   tracepoint = rb_tracepoint_new(0, events, gctracker_hook, (void *) NULL);
   if (NIL_P(tracepoint)) {
     return false;
@@ -149,11 +190,15 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   if (last_record) {
     last_record->cycles += record->cycles;
     last_record->duration += record->duration;
+    last_record->mark_duration += record->mark_duration;
+    last_record->sweep_duration += record->sweep_duration;
   }
   
-  VALUE stats = rb_ary_new2(2);
+  VALUE stats = rb_ary_new2(4);
   rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
   rb_ary_store(stats, 1, ULONG2NUM(record->duration));
+  rb_ary_store(stats, 2, ULONG2NUM(record->mark_duration));
+  rb_ary_store(stats, 3, ULONG2NUM(record->sweep_duration));
 
   free(record);  
 
