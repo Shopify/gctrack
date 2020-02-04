@@ -65,5 +65,15 @@ class TestGctrack < Test::Unit::TestCase
   ensure
     GC::Tracker.disable
   end
+
+  def test_enabled_exit
+    child_pid = fork do
+      GC::Tracker.enable
+      at_exit {} # Clear minitest hooks
+      exit(0)
+    end
+    _, status = Process.waitpid2(child_pid)
+    assert_equal 0, status.to_i
+  end
 end
 
