@@ -240,8 +240,7 @@ gctracker_disable(VALUE self)
 void
 Init_gctrack()
 {
-  VALUE mGC = rb_define_module("GC");
-  VALUE cTracker = rb_define_module_under(mGC, "Tracker");
+  VALUE cTracker = rb_define_module_under(rb_mGC, "Tracker");
 
   rb_define_module_function(cTracker, "enable", gctracker_enable, 0);
   rb_define_module_function(cTracker, "enabled?", gctracker_enabled_p, 0);
