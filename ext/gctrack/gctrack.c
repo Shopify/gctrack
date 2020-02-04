@@ -101,7 +101,7 @@ create_tracepoint()
  *    GC::Tracker.end_record    # nil from the last #start_record, that returned false
  */
 static VALUE
-gctracker_start_record(int argc, VALUE *argv, VALUE klass)
+gctracker_start_record(VALUE klass)
 {
   if(!gctracker_enabled()) {
     return Qfalse;
@@ -138,7 +138,7 @@ gctracker_start_record(int argc, VALUE *argv, VALUE klass)
  *    GC::Tracker.end_record    # nil
  */
 static VALUE
-gctracker_end_record(int argc, VALUE *argv, VALUE klass)
+gctracker_end_record(VALUE klass)
 {
   if (!last_record) {
     return Qnil;
@@ -172,7 +172,7 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
  *    GC::Tracker.enable    # true
  */
 static VALUE 
-gctracker_enabled_p(int argc, VALUE *argv, VALUE klass)
+gctracker_enabled_p(VALUE klass)
 {
   return gctracker_enabled() ? Qtrue : Qfalse;
 }
@@ -190,7 +190,7 @@ gctracker_enabled_p(int argc, VALUE *argv, VALUE klass)
  *    GC::Tracker.enabled?  # true
  */
 static VALUE
-gctracker_enable(int argc, VALUE *argv, VALUE klass)
+gctracker_enable(VALUE klass)
 {
   if (gctracker_enabled()) {
     return Qtrue;
