@@ -1,5 +1,5 @@
 require 'mkmf'
 
-$CFLAGS = "-O3 -Wall"
+$CFLAGS << " -O3 -Wall "
 
 create_makefile('gctrack/gctrack')

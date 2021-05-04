@@ -3,3 +3,4 @@
 /lib/gctrack/*.bundle
 /tmp/*
 *.gem
+Gemfile.lock
