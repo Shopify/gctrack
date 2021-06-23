@@ -13,7 +13,7 @@ GCTrack is published to [rubygems.org](https://rubygems.org/gems/gctrack).
 Simply add it as a dependency to your `Gemfile`
 
 ```ruby
-gem 'gctrack', '~> 0.1.0'
+gem 'gctrack', '~> 0.1.1'
 ```
 
 #### #2 Enable the extension

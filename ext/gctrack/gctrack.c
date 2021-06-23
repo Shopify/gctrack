@@ -34,12 +34,8 @@ nanotime()
 static inline void 
 add_gc_cycle(uint64_t duration)
 {
-  record_t *record = last_record;
-  while (record) {
-    record->cycles = record->cycles + 1;
-    record->duration = record->duration + duration;
-    record = record->parent;
-  }
+  last_record->cycles += 1;
+  last_record->duration += duration;
 }
 
 static void
@@ -71,7 +67,7 @@ gctracker_enabled()
 static void 
 gctracker_hook(VALUE tpval, void *data)
 {
-  if (!gctracker_enabled() && !last_record) {
+  if (!last_record || !gctracker_enabled()) {
     return;
   }
   rb_trace_arg_t *tparg = rb_tracearg_from_tracepoint(tpval);
@@ -187,6 +183,10 @@ gctracker_end_record(int argc, VALUE *argv, VALUE klass)
   last_record = record->parent;
 
   VALUE stats = rb_ary_new2(4);
+  if (last_record) {
+    last_record->cycles += record->cycles;
+    last_record->duration += record->duration;
+  }
   rb_ary_store(stats, 0, ULONG2NUM(record->cycles));
   rb_ary_store(stats, 1, ULONG2NUM(record->duration));
   rb_ary_store(stats, 2, ULONG2NUM(record->allocations));
